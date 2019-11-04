@@ -1,6 +1,7 @@
 var NodeHelper = require("node_helper");
 var request = require("request");
 var iconv = require("iconv-lite"); //http://stackoverflow.com/questions/12040643/nodejs-encoding-using-request
+var xmldom = require("xmldom");
 
 module.exports = NodeHelper.create({
 	start: function () {
@@ -21,7 +22,7 @@ module.exports = NodeHelper.create({
 			for(var deviceObject in payload.deviceList) {
 				var device = JSON.parse(payload.deviceList[deviceObject]);
 				deviceIds = (deviceIds.length===0)? device.deviceId : deviceIds + "," + device.deviceId;
-			}//for
+			}
 			//console.log("Requesting information from the following devices: " + deviceIds);
 			var ccu2url = payload.url;
 			if(ccu2url.substring(0,7) !== "http://") { ccu2url = "http://" + payload.url; }
@@ -52,8 +53,7 @@ module.exports = NodeHelper.create({
 	 */
 	processXMLResponse: function(deviceIds, xml) {
 		//console.log("IN: processXMLResponse... " + deviceIds);
-		var DOMParser = require("xmldom").DOMParser;
-		var xmlDocument = new DOMParser().parseFromString(xml, "application/xml");
+		var xmlDocument = new xmldom.DOMParser().parseFromString(xml, "application/xml");
 		var requestedIds = deviceIds.split(",");
 		var response = [];
 		for(var currentId = 0; currentId < requestedIds.length; currentId++) {

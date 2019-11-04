@@ -5,7 +5,7 @@ Module.register("MMM-Homematic-Thermostats",{
 		devices: [],
 		ccu2IP: "homematic-ccu2",
 		xmlapiURL: "config/xmlapi",
-		updateInterval: 300000,  //5min
+		updateInterval: 300000,  // 5min
 		style: "lines",
 		setTempInBrackets: true,
 	},
@@ -66,7 +66,6 @@ Module.register("MMM-Homematic-Thermostats",{
 
 		for (var dev in configSettings) {
 			var device = configSettings[dev];
-			var devId = device.id;
 
 			settings = {};
 
@@ -156,7 +155,6 @@ Module.register("MMM-Homematic-Thermostats",{
 			if(payload && payload.content){
 				// Log.info(payload.content);
 				this.prepareOutputForDevices(payload.content);
-
 			}
 		}
 	},
