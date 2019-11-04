@@ -275,7 +275,7 @@ The following properties can be configured:
 </table>
 
 ## Troubleshooting
-Make sure that the XML-API addon is working fine. If you've setup the XML-API addon and your HomeMatic central control unit (CCU2) with default values, you should be able to see a list of all your connected devices by clicking the following URL:<br> <a href="http://homematic-ccu2/config/xmlapi/devicelist.cgi" target="_blank">http://homematic-ccu2/config/xmlapi/devicelist.cgi</a><br>
+Make sure that the XML-API addon is working fine. If you've setup the XML-API addon and your HomeMatic central control unit (CCU2) with default values, you should be able to see a list of all your connected devices by clicking the following URL:<br> <a href="http://homematic-ccu2/config/xmlapi/devicelist.cgi" target="_blank"><http://homematic-ccu2/config/xmlapi/devicelist.cgi></a><br>
 Is everything fine, it should look like:<br>
 <img src="https://cloud.githubusercontent.com/assets/26480749/24081489/198aa8ea-0cb5-11e7-93fb-dd43a14b1883.png" height="150"/>
 
@@ -302,4 +302,4 @@ There is a very good Magic Mirror Module <a href="https://github.com/Sickboy78/M
 * <a href="https://www.homematic-forum.de/" target="_blank">homematic-forum.de</a> - Forum to get help
 * <a href="https://www.homematic-inside.de/software/download/item/homematic-skript" target="_blank">HomeMatic script documentation / specification</a>
 * <a href="https://www.homematic-inside.de/software/addons/item/xmlapi" target="_blank">XML-API section on homematic-inside.de</a>
-*  <a href="https://wiki.fhem.de/wiki/HM-CC-RT-DN_Funk-Heizk%C3%B6rperthermostat" target="_blank">FHEM wiki for HM-CC-RT-DN</a> - All information about the device type (German only)
+* <a href="https://wiki.fhem.de/wiki/HM-CC-RT-DN_Funk-Heizk%C3%B6rperthermostat" target="_blank">FHEM wiki for HM-CC-RT-DN</a> - All information about the device type (German only)

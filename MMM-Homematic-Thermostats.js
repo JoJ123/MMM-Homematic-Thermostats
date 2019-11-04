@@ -1,24 +1,24 @@
 Module.register("MMM-Homematic-Thermostats",{
 
-    // Default module config.
-    defaults: {
-		devices: [], 
+	// Default module config.
+	defaults: {
+		devices: [],
 		ccu2IP: "homematic-ccu2",
 		xmlapiURL: "config/xmlapi",
 		updateInterval: 300000,  //5min
 		style: "lines",
 		setTempInBrackets: true,
-    },
-	
+	},
+
 	homematicUrl: "",
 	moduleDisplay: "",
 	configurationSettings:[],
-	
-    // Override dom generator.
+
+	// Override dom generator.
 	getDom: function() {
 		var wrapper = document.createElement("div");
-        wrapper.innerHTML = this.moduleDisplay;
-        return wrapper;
+		wrapper.innerHTML = this.moduleDisplay;
+		return wrapper;
 	},
 
 	// Define start sequence.
@@ -34,40 +34,40 @@ Module.register("MMM-Homematic-Thermostats",{
 		self.getDataFromCCU2();
 		Log.info("Starting module: " + this.name + " accessing URL " + self.homematicUrl);
 	},
-	
+
 	/**
-	 * Send the notification request to the node_helper to get 
+	 * Send the notification request to the node_helper to get
 	 * all settings of all requested devices
 	 */
 	getDataFromCCU2: function() {
-		var self = this; 
+		var self = this;
 		this.sendSocketNotification(
-			'MMM_CCU2_REQUEST',
+			"MMM_CCU2_REQUEST",
 			{
 				deviceList: self.createPayloadForRequest(),
 				url: self.homematicUrl,
 			}
 		);
-	},	
+	},
 
-	/** 
+	/**
 	 * Prepare the settings specified in the config.js
 	 * and do some basic checks to prevent common errors
 	 */
 	readConfiguration : function(configSettings) {
 		var item = {};
-		
-		// which table columns have to be displayed 
+
+		// which table columns have to be displayed
 		var globColActTemp = true;
 		var globColSetTemp = false;
 		var globColHum = false;
 		var globColMode = false;
 		var settings = {};
-		
-		for (var dev in configSettings) { 
+
+		for (var dev in configSettings) {
 			var device = configSettings[dev];
 			var devId = device.id;
-			
+
 			settings = {};
 
 			// defaults if not set for specific device
@@ -86,8 +86,8 @@ Module.register("MMM-Homematic-Thermostats",{
 			var devTempThresholdLow = 5;
 			var devHumThresholdHigh = 60;
 			var devHumThresholdLow = 35;
-			
-			// check if default values should be overwritten for this device 
+
+			// check if default values should be overwritten for this device
 			if(device.label) { devLabel = device.label; }
 			if(device.showSetTemperature) { devSetTemp = device.showSetTemperature; globColSetTemp = true; }
 			if(device.showCurrentMode) { devMode = device.showCurrentMode; globColMode = true; }
@@ -124,7 +124,7 @@ Module.register("MMM-Homematic-Thermostats",{
 			settings["configDeviceHumThresholdLow"] = devHumThresholdLow;
 			item[device.id] = settings;
 		}
-		
+
 		settings = {};
 		settings["configColumnActTemp"] = globColActTemp;
 		settings["configColumnSetTemp"] = globColSetTemp;
@@ -135,32 +135,32 @@ Module.register("MMM-Homematic-Thermostats",{
 		console.log(item);
 		return item;
 	},
-	
+
 	/**
 	 * Creates the payload for the socket notification
 	 */
 	createPayloadForRequest : function() {
-        var payload = [];
-		for (var dev in this.config.devices) { 
+		var payload = [];
+		for (var dev in this.config.devices) {
 			var device = this.config.devices[dev];
 			payload.push(JSON.stringify({"deviceId": device.id}));
 		}
-		return payload;		
+		return payload;
 	},
-	
+
 	/**
 	 * Receives the notification with the response from the node_helper
 	 */
-    socketNotificationReceived: function(notification, payload) {
-        if (notification === 'MMM_CCU2_RESPONSE' ) {
-            if(payload && payload.content){
+	socketNotificationReceived: function(notification, payload) {
+		if (notification === "MMM_CCU2_RESPONSE" ) {
+			if(payload && payload.content){
 				// Log.info(payload.content);
 				this.prepareOutputForDevices(payload.content);
 
-            }
-        }
-    },
-	
+			}
+		}
+	},
+
 	/**
 	 * Prepares the output for displaying the values in the mirror.
 	 */
@@ -168,12 +168,12 @@ Module.register("MMM-Homematic-Thermostats",{
 		var deviceName = "";
 		// @spitzlbergerj, 20190210: wall thermostat = WT, radiator thermostat = RT
 		var deviceType = "RT";
-		var warn_color = "red"
+		var warnColor = "red"
 
 		if (this.config.warnColor) {
-			warn_color = this.config.warnColor;
+			warnColor = this.config.warnColor;
 		}
-		
+
 		if (this.config.style == "table") {
 			/**
 			 * Display the result as HTML table
@@ -182,7 +182,7 @@ Module.register("MMM-Homematic-Thermostats",{
 			 * @spitzlbergerj, 20190210
 			 **/
 			var wrapper = document.createElement("div");
-			wrapper.className = 'deviceTable';
+			wrapper.className = "deviceTable";
 
 			var table = document.createElement("table");
 			table.border = 0;
@@ -203,7 +203,7 @@ Module.register("MMM-Homematic-Thermostats",{
 				var classNameStr = "";
 
 				// @spitzlbergerj, 20190210: wall thermostat doesn't contain element VALVE_STATE
-				if (settingsArray['VALVE_STATE']) {
+				if (settingsArray["VALVE_STATE"]) {
 					var valveState = this.prepareAttribute("VALVE_STATE", settingsArray,0);
 					var actualHumidity = -1;
 					var actualHumidityStr = "";
@@ -214,8 +214,8 @@ Module.register("MMM-Homematic-Thermostats",{
 					var actualHumidityStr = this.prepareAttribute("ACTUAL_HUMIDITY", settingsArray, this.configurationSettings[deviceId]["configDevicePrecisionHum"]);
 				}
 				var setTemperature = this.prepareAttribute("SET_TEMPERATURE", settingsArray, this.configurationSettings[deviceId]["configDevicePrecisionTemp"]);
-				
-				//Before displaying the settings double-check against the configurationSettings 
+
+				//Before displaying the settings double-check against the configurationSettings
 				//(config.js) to drive the desired behavior...
 				if(this.configurationSettings[deviceId]["configDeviceLabel"] !== "") {
 					deviceLabel = this.configurationSettings[deviceId]["configDeviceLabel"];
@@ -224,39 +224,39 @@ Module.register("MMM-Homematic-Thermostats",{
 				if(this.configurationSettings[deviceId]["configDeviceShowFaultReport"] === true) {
 					configDeviceShowFaultReport = faultReport;
 				}
-				
+
 				classNameStr = "";
-				
+
 				if (this.config.style == "lines") {
 					var configDeviceShowMode = "";
 					if(this.configurationSettings[deviceId]["configDeviceShowMode"] === true) {
 						configDeviceShowMode = "<span class='deviceMode'>&nbsp;("+currentMode+")</span>";
-					}		
+					}
 					var configDeviceShowSetTemperature = "";
 					if(this.configurationSettings[deviceId]["configDeviceShowSetTemperature"] === true) {
 						//style the divider (slash) with the same style as the label
 						configDeviceShowSetTemperature = "<span class='deviceLabel'>&nbsp;/&nbsp;</span><span class='deviceSetTemperature'>" + setTemperature + "</span>";
-					}					
+					}
 					deviceLabel = "<span class='deviceLabel'>" + deviceLabel + ":&nbsp;</span>";
 
 					// @spitzlbergerj warn colors
-					classNameStr = 'deviceActualTemperature';
+					classNameStr = "deviceActualTemperature";
 					if(this.configurationSettings[deviceId]["configDeviceWarnTempLow"] && actualTemperature <= this.configurationSettings[deviceId]["configDeviceTempThresholdLow"]) {
-						classNameStr = classNameStr + ' bright ' + warn_color;
+						classNameStr = classNameStr + " bright " + warnColor;
 					}
 					if(this.configurationSettings[deviceId]["configDeviceWarnTempHigh"] && actualTemperature >= this.configurationSettings[deviceId]["configDeviceTempThresholdHigh"]) {
-						classNameStr = classNameStr + ' bright ' + warn_color;
+						classNameStr = classNameStr + " bright " + warnColor;
 					}
 					actualTemperatureStr = "<span class='" + classNameStr + "'>" + actualTemperatureStr + "</span>";
 
 					// @spitzlbergerj added humidity
 					classNameStr = "";
-					if(this.configurationSettings[deviceId]["configDeviceShowHumidity"] === true && deviceType == "WT") { 
+					if(this.configurationSettings[deviceId]["configDeviceShowHumidity"] === true && deviceType == "WT") {
 						if(this.configurationSettings[deviceId]["configDeviceWarnHumLow"] && actualHumidity <= this.configurationSettings[deviceId]["configDeviceHumThresholdLow"]) {
-							classNameStr = " class='bright " + warn_color + "'";
+							classNameStr = " class='bright " + warnColor + "'";
 						}
 						if(this.configurationSettings[deviceId]["configDeviceWarnHumHigh"] && actualHumidity >= this.configurationSettings[deviceId]["configDeviceHumThresholdHigh"]) {
-							classNameStr = " class='bright " + warn_color + "'";
+							classNameStr = " class='bright " + warnColor + "'";
 						}
 						humidityStrForLines = "<span class='deviceHumidity'>&nbsp;(" + this.translate("UNIT_HUM") + ":&nbsp;" + "<span"+ classNameStr + ">" + actualHumidityStr + "</span>)&nbsp;</span>";
 					} else {
@@ -274,30 +274,30 @@ Module.register("MMM-Homematic-Thermostats",{
 					 * create table row
 					 * @spitzlbergerj, 20190210
 					 **/
-					
+
 					var row = document.createElement("tr");
-					row.className = 'deviceContainer';
-					row.vAlign = 'top';
-					
+					row.className = "deviceContainer";
+					row.vAlign = "top";
+
 					var rowDevice = document.createElement("td");
-					rowDevice.className = 'deviceLabel';
+					rowDevice.className = "deviceLabel";
 					rowDevice.width = "120px";
 					rowDevice.appendChild(document.createTextNode(deviceLabel));
-					
+
 					var rowActual = document.createElement("td");
-					classNameStr = 'deviceActualTemperature';
+					classNameStr = "deviceActualTemperature";
 					if(this.configurationSettings[deviceId]["configDeviceWarnTempLow"] && actualTemperature <= this.configurationSettings[deviceId]["configDeviceTempThresholdLow"]) {
-						classNameStr = classNameStr + ' bright ' + warn_color;
+						classNameStr = classNameStr + " bright " + warnColor;
 					}
 					if(this.configurationSettings[deviceId]["configDeviceWarnTempHigh"] && actualTemperature >= this.configurationSettings[deviceId]["configDeviceTempThresholdHigh"]) {
-						classNameStr = classNameStr + ' bright ' + warn_color;
+						classNameStr = classNameStr + " bright " + warnColor;
 					}
 					rowActual.className = classNameStr;
 					rowActual.width = "100px";
 					rowActual.appendChild(document.createTextNode(actualTemperatureStr));
-					
+
 					var rowSet = document.createElement("td");
-					rowSet.className = 'deviceSetTemperature';
+					rowSet.className = "deviceSetTemperature";
 					rowSet.width = "100px";
 					if(this.configurationSettings[deviceId]["configDeviceShowSetTemperature"] === true) {
 						if (this.config.setTempInBrackets) {
@@ -308,28 +308,28 @@ Module.register("MMM-Homematic-Thermostats",{
 					} else {
 						rowHum.appendChild(document.createTextNode(""));
 					}
-					
+
 					var rowMode = document.createElement("td");
-					rowMode.className = 'deviceMode';
+					rowMode.className = "deviceMode";
 					rowMode.width = "100px";
 					if(this.configurationSettings[deviceId]["configDeviceShowMode"] === true) {
 						rowMode.appendChild(document.createTextNode(currentMode));
 					} else {
 						rowMode.appendChild(document.createTextNode(""));
 					}
-					
+
 					var rowFault = document.createElement("td");
-					rowFault.className = 'faultReporting';
+					rowFault.className = "faultReporting";
 					rowFault.appendChild(document.createTextNode(faultReport));
-					
+
 					if (deviceType == "WT") {
 						var rowHum = document.createElement("td");
-						classNameStr = 'deviceHumidity';
+						classNameStr = "deviceHumidity";
 						if(this.configurationSettings[deviceId]["configDeviceWarnHumLow"] && actualHumidity <= this.configurationSettings[deviceId]["configDeviceHumThresholdLow"]) {
-							classNameStr = classNameStr + ' bright ' + warn_color;
+							classNameStr = classNameStr + " bright " + warnColor;
 						}
 						if(this.configurationSettings[deviceId]["configDeviceWarnHumHigh"] && actualHumidity >= this.configurationSettings[deviceId]["configDeviceHumThresholdHigh"]) {
-							classNameStr = classNameStr + ' bright ' + warn_color;
+							classNameStr = classNameStr + " bright " + warnColor;
 						}
 						rowHum.className = classNameStr;
 						rowHum.width = "100px";
@@ -340,39 +340,39 @@ Module.register("MMM-Homematic-Thermostats",{
 						}
 					} else if (deviceType == "RT") {
 						var rowValve = document.createElement("td");
-						rowValve.className = 'deviceValveState';
+						rowValve.className = "deviceValveState";
 						rowValve.width = "100px";
 						rowValve.appendChild(document.createTextNode(valveState));
 					}
-					
+
 					// Building of the table row
 					var columns = 2;
 					row.appendChild(rowDevice);
 					row.appendChild(rowActual);
-					
+
 					if(this.configurationSettings["global"]["configColumnSetTemp"] === true) {
 						columns += 1;
 						row.appendChild(rowSet);
 					}
-					
-					if(this.configurationSettings["global"]["configColumnHumidity"] === true) { 
+
+					if(this.configurationSettings["global"]["configColumnHumidity"] === true) {
 						columns += 1;
 						row.appendChild(rowHum);
 					}
-					
-					if(this.configurationSettings["global"]["configColumnMode"] === true) { 
+
+					if(this.configurationSettings["global"]["configColumnMode"] === true) {
 						columns += 1;
 						row.appendChild(rowMode);
 					}
-					
+
 					table.appendChild(row);
-					
+
 					if(this.configurationSettings[deviceId]["configDeviceShowFaultReport"] === true) {
 						var row2 = document.createElement("tr");
-						row2.className = 'faultReportingRow';
-						row2.vAlign = 'top';
+						row2.className = "faultReportingRow";
+						row2.vAlign = "top";
 						var rowFault = document.createElement("td");
-						rowFault.className = 'faultReporting';
+						rowFault.className = "faultReporting";
 						rowFault.colSpan=columns;
 						rowFault.appendChild(document.createTextNode(configDeviceShowFaultReport));
 						if(configDeviceShowFaultReport != "") {
@@ -388,10 +388,10 @@ Module.register("MMM-Homematic-Thermostats",{
 			deviceName = table.outerHTML;
 		}
 		// Log.info(deviceName);
-		this.moduleDisplay = deviceName; 
+		this.moduleDisplay = deviceName;
 		this.updateDom();
 	},
-	
+
 	/**
 	 * Prepare the output of the given attribute. Reads the attributeName from the
 	 * settingsArray and do further processing on it, i.e. to display the value with the
@@ -402,17 +402,17 @@ Module.register("MMM-Homematic-Thermostats",{
 		var preparedAttributeValue = "";
 		var attributeNameArray = settingsArray[attributeName];
 		switch(attributeName){
-			//As of now, all attributes below can be handled with the same logic
-			case "ACTUAL_TEMPERATURE":
-			case "SET_TEMPERATURE":
-			case "VALVE_STATE":	
-			case "ACTUAL_HUMIDITY":	
-				preparedAttributeValue = Number(parseFloat(attributeNameArray["value"])).toLocaleString(this.config.localeStr, {minimumFractionDigits: precision, maximumFractionDigits: precision}) + attributeNameArray["valueunit"];
-				break;
+		//As of now, all attributes below can be handled with the same logic
+		case "ACTUAL_TEMPERATURE":
+		case "SET_TEMPERATURE":
+		case "VALVE_STATE":
+		case "ACTUAL_HUMIDITY":
+			preparedAttributeValue = Number(parseFloat(attributeNameArray["value"])).toLocaleString(this.config.localeStr, {minimumFractionDigits: precision, maximumFractionDigits: precision}) + attributeNameArray["valueunit"];
+			break;
 		}
 		return preparedAttributeValue;
-	}, 
-	
+	},
+
 	/**
 	 * Prepare the control mode of the radiator specified in CONTROL_MODE
 	 * parameter. Translate the returning number according to the Homematic
@@ -421,8 +421,8 @@ Module.register("MMM-Homematic-Thermostats",{
 	prepareControlModeOutput: function(settingsArray) {
 		var controlMode = Number(settingsArray["CONTROL_MODE"]["value"]);
 		// @spitzlbergerj, 20190210: wall thermostat doesn't contain element VALVE_STATE
-		if (settingsArray['VALVE_STATE']) {
-			// @spitzlbergerj, 20190210: Array with element VALVE_STATE, should be radiator thermostat 
+		if (settingsArray["VALVE_STATE"]) {
+			// @spitzlbergerj, 20190210: Array with element VALVE_STATE, should be radiator thermostat
 			var valveState = Number(settingsArray["VALVE_STATE"]["value"]);
 			var valveStateDisplay = valveState + settingsArray["VALVE_STATE"]["valueunit"];
 		} else {
@@ -432,40 +432,40 @@ Module.register("MMM-Homematic-Thermostats",{
 		var translatedMode = this.translate("RADIATOR_OFF");
 		var modus = "AUTO"; //default
 		switch (controlMode){
-			case 0: 
-				modus = "AUTO";
-				if(valveState > 0) {
-					//Do not show word "auto" in auto mode: this.translate("RADIATOR_MODE_".concat(modus))
-					translatedMode = this.translate("HEATS_WITH") + " " + valveStateDisplay;
-				} else if(valveState < 0) {
-					//it's a wall thermostat
-					translatedMode = this.translate("RADIATOR_MODE") + " " + this.translate("RADIATOR_MODE_".concat(modus));
-				}
-				break;
-			case 1: 
-				modus = "MANUAL";
-				if(valveState !== 0) {
-					translatedMode = this.translate("RADIATOR_MODE_".concat(modus)) + ", " + this.translate("HEATS_WITH") + " " + valveStateDisplay;
-				} else if(valveState < 0) {
-					//it's a wall thermostat
-					translatedMode = this.translate("RADIATOR_MODE") + " " + this.translate("RADIATOR_MODE_".concat(modus));
-				}
-				break;
-			case 2: 
-				modus = "PARTY"; //Urlaubsmodus
-				var urlaubsEnde = moment().set({'year': settingsArray["PARTY_STOP_YEAR"]["value"], 
-														'month': (settingsArray["PARTY_STOP_MONTH"]["value"] -1), 
-														'date': settingsArray["PARTY_STOP_DAY"]["value"]});
-				translatedMode = this.translate("RADIATOR_MODE_".concat(modus)) + " " + this.translate("HOLIDAY_MODE_UNTIL") + " ";
-				translatedMode = translatedMode + urlaubsEnde.format("ddd, MMM Do Y");
-				break;
-			case 3: 
-				modus = "BOOST";
-				translatedMode = this.translate("RADIATOR_MODE_".concat(modus));
+		case 0:
+			modus = "AUTO";
+			if(valveState > 0) {
+				//Do not show word "auto" in auto mode: this.translate("RADIATOR_MODE_".concat(modus))
+				translatedMode = this.translate("HEATS_WITH") + " " + valveStateDisplay;
+			} else if(valveState < 0) {
+				//it's a wall thermostat
+				translatedMode = this.translate("RADIATOR_MODE") + " " + this.translate("RADIATOR_MODE_".concat(modus));
+			}
+			break;
+		case 1:
+			modus = "MANUAL";
+			if(valveState !== 0) {
+				translatedMode = this.translate("RADIATOR_MODE_".concat(modus)) + ", " + this.translate("HEATS_WITH") + " " + valveStateDisplay;
+			} else if(valveState < 0) {
+				//it's a wall thermostat
+				translatedMode = this.translate("RADIATOR_MODE") + " " + this.translate("RADIATOR_MODE_".concat(modus));
+			}
+			break;
+		case 2:
+			modus = "PARTY"; //Urlaubsmodus
+			var urlaubsEnde = moment().set({"year": settingsArray["PARTY_STOP_YEAR"]["value"],
+				"month": (settingsArray["PARTY_STOP_MONTH"]["value"] -1),
+				"date": settingsArray["PARTY_STOP_DAY"]["value"]});
+			translatedMode = this.translate("RADIATOR_MODE_".concat(modus)) + " " + this.translate("HOLIDAY_MODE_UNTIL") + " ";
+			translatedMode = translatedMode + urlaubsEnde.format("ddd, MMM Do Y");
+			break;
+		case 3:
+			modus = "BOOST";
+			translatedMode = this.translate("RADIATOR_MODE_".concat(modus));
 		}//switch
 		return translatedMode;
 	},
-	
+
 	/**
 	 * Translate the values of parameter CONTROL_MODE to their
 	 * human readable values that can be used for i18n afterwards
@@ -475,65 +475,65 @@ Module.register("MMM-Homematic-Thermostats",{
 		var controlMode = Number(controlModeParameter["value"]);
 		var modus = "AUTO"; //default
 		switch (controlMode){
-			case 0: 
-				modus = "AUTO";
-				break;
-			case 1: 
-				modus = "MANUAL";
-				break;
-			case 2: 
-				modus = "PARTY"; //Urlaubsmodus
-				break;
-			case 3: 
-				modus = "BOOST";
+		case 0:
+			modus = "AUTO";
+			break;
+		case 1:
+			modus = "MANUAL";
+			break;
+		case 2:
+			modus = "PARTY"; //Urlaubsmodus
+			break;
+		case 3:
+			modus = "BOOST";
 		}//switch
 		return modus;
 	},
-	
+
 	/**
 	 * Prepare the error (if any) for the FAULT_REPORTING parameter.
-	 * Translate the states into their values (according Homematic documentation) 
-	 * to be able to use it in the translation files. Return an empty 
+	 * Translate the states into their values (according Homematic documentation)
+	 * to be able to use it in the translation files. Return an empty
 	 * string if everything is fine.
 	 */
-	prepareFaultReporting: function(settingsArray) { 
+	prepareFaultReporting: function(settingsArray) {
 		var errorMsg = "";
 		// @spitzlbergerj, 20190210: wall thermostat doesn't contain element FAULT_REPORTING
 		if (settingsArray["FAULT_REPORTING"] >= 0) {
-			// @spitzlbergerj, 20190210: Array with element FAULT-REPORTING, should be radiator thermostat 
+			// @spitzlbergerj, 20190210: Array with element FAULT-REPORTING, should be radiator thermostat
 			var faultCode = Number(settingsArray["FAULT_REPORTING"]["value"]);
 			switch (faultCode){
-				case 1: 
-					errorMsg = this.translate("VALVE_TIGHT");
-					break;
-				case 2: 
-					errorMsg = this.translate("ADJUSTING_RANGE_TOO_LARGE");
-					break;
-				case 3: 
-					errorMsg = this.translate("ADJUSTING_RANGE_TOO_SMALL");
-					break;
-				case 4: 
-					errorMsg = this.translate("COMMUNICATION_ERROR");
-					break;
-				case 5: 
-					errorMsg = ""; //Not available - no documentation
-					break;
-				case 6: 
-					errorMsg = this.translate("LOWBAT");
-					//Append the current battery state just for information
-					errorMsg += " ";// + Number(parseFloat(settingsArray["BATTERY_STATE"]["value"]).toFixed(2)) + settingsArray["BATTERY_STATE"]["valueunit"]
-					break;
-				case 7:
-					errorMsg = this.translate("VALVE_ERROR_POSITION");
+			case 1:
+				errorMsg = this.translate("VALVE_TIGHT");
+				break;
+			case 2:
+				errorMsg = this.translate("ADJUSTING_RANGE_TOO_LARGE");
+				break;
+			case 3:
+				errorMsg = this.translate("ADJUSTING_RANGE_TOO_SMALL");
+				break;
+			case 4:
+				errorMsg = this.translate("COMMUNICATION_ERROR");
+				break;
+			case 5:
+				errorMsg = ""; //Not available - no documentation
+				break;
+			case 6:
+				errorMsg = this.translate("LOWBAT");
+				//Append the current battery state just for information
+				errorMsg += " ";// + Number(parseFloat(settingsArray["BATTERY_STATE"]["value"]).toFixed(2)) + settingsArray["BATTERY_STATE"]["valueunit"]
+				break;
+			case 7:
+				errorMsg = this.translate("VALVE_ERROR_POSITION");
 			}
 		}
 		//Return the translated i18n error message - if any
 		if(errorMsg !== "") {
 			errorMsg = "<span class='faultReporting'>"+ this.translate("WARNING") + errorMsg + "</span>";
-		} 
+		}
 		return errorMsg;
 	},
-	
+
 	// Define required style-sheet scripts
 	getStyles: function() {
 		return ["MMM-Homematic-Thermostats.css"];
@@ -543,12 +543,12 @@ Module.register("MMM-Homematic-Thermostats",{
 	getScripts: function() {
 		return ["moment.js"];
 	},
-		
+
 	// Define required translation files
 	getTranslations: function() {
 		return {
-				en: "translations/en.json",
-				de: "translations/de.json"
+			en: "translations/en.json",
+			de: "translations/de.json"
 		};
 	}
 });
