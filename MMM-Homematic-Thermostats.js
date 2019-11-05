@@ -6,7 +6,6 @@ Module.register("MMM-Homematic-Thermostats", {
 		ccu2IP: "homematic-ccu2",
 		xmlapiURL: "config/xmlapi",
 		updateInterval: 300000,  // 5min
-		style: "lines",
 		warnColor: "red",
 		showSetTemperature: false,
 		showFaultReporting: false,
@@ -125,7 +124,8 @@ Module.register("MMM-Homematic-Thermostats", {
 	socketNotificationReceived: function (notification, payload) {
 		if (notification === "MMM_CCU2_RESPONSE") {
 			if (payload && payload.content) {
-				this.prepareOutputForDevices(payload.content);
+				this.moduleDisplay = this.prepareOutputForDevices(payload.content);
+				this.updateDom();
 			}
 		}
 	},
@@ -134,231 +134,69 @@ Module.register("MMM-Homematic-Thermostats", {
 	 * Prepares the output for displaying the values in the mirror.
 	 */
 	prepareOutputForDevices: function (response) {
-		var deviceName = "";
-		// @spitzlbergerj, 20190210: wall thermostat = WT, radiator thermostat = RT
-		var deviceType = "RT";
-		var warnColor = "red"
+		let htmlOutput = "";
 
-		if (this.config.warnColor) {
-			warnColor = this.config.warnColor;
-		}
+		response.forEach(deviceData => {
+			for (let deviceId in deviceData) {
+				const device = deviceData[deviceId][0]
+				const deviceType = !!device["VALVE_STATE"] ? 'RT' : 'WT';
 
-		if (this.config.style == "table") {
-			/**
-			 * Display the result as HTML table
-			 * create table
-			 *
-			 * @spitzlbergerj, 20190210
-			 **/
-			var wrapper = document.createElement("div");
-			wrapper.className = "deviceTable";
+				const configDeviceLabel = this.configurationSettings[deviceId]["configDeviceLabel"]
+				const deviceLabel = configDeviceLabel !== "" ? configDeviceLabel : device.deviceName
+				const actualTemperature = device["ACTUAL_TEMPERATURE"]["value"];
+				const actualTemperatureStr = this.prepareAttribute("ACTUAL_TEMPERATURE", device, this.configurationSettings[deviceId]["configDevicePrecisionTemp"]);
+				const setTemperature = this.prepareAttribute("SET_TEMPERATURE", device, this.configurationSettings[deviceId]["configDevicePrecisionTemp"]);
+				const currentMode = this.prepareControlModeOutput(device);
+				const actualHumidity = deviceType === 'WT' ? device["ACTUAL_HUMIDITY"]["value"] : undefined;
+				const actualHumidityStr = deviceType === 'WT' ? this.prepareAttribute("ACTUAL_HUMIDITY", device, this.configurationSettings[deviceId]["configDevicePrecisionHum"]) : undefined;
+				const faultMode = this.prepareFaultReporting(device["FAULT_REPORTING"]);
 
-			var table = document.createElement("table");
-			table.border = 0;
-		}
+				let classNameStr = ""
+				let htmlDeviceEntry = "<span class='deviceContainer'>";
 
-		for (var device in response) {
-			var deviceArray = response[device];
-			// Log.info(deviceArray);
+				// Label
+				htmlDeviceEntry += "<span class='deviceLabel'>" + deviceLabel + ":&nbsp;</span>"
 
-			for (var deviceId in deviceArray) {
-				var settingsArray = deviceArray[deviceId][0];
-				var deviceLabel = settingsArray["deviceName"];
-				var faultReport = this.prepareFaultReporting(settingsArray);
-				var currentMode = this.prepareControlModeOutput(settingsArray);
-				var actualTemperature = settingsArray["ACTUAL_TEMPERATURE"]["value"];
-				var actualTemperatureStr = this.prepareAttribute("ACTUAL_TEMPERATURE", settingsArray, this.configurationSettings[deviceId]["configDevicePrecisionTemp"]);
-				var humidityStrForLines = "";
-				var classNameStr = "";
-
-				// @spitzlbergerj, 20190210: wall thermostat doesn't contain element VALVE_STATE
-				if (settingsArray["VALVE_STATE"]) {
-					var valveState = this.prepareAttribute("VALVE_STATE", settingsArray, 0);
-					var actualHumidity = -1;
-					var actualHumidityStr = "";
-				} else {
-					deviceType = "WT";
-					var valveState = "";
-					var actualHumidity = settingsArray["ACTUAL_HUMIDITY"]["value"];
-					var actualHumidityStr = this.prepareAttribute("ACTUAL_HUMIDITY", settingsArray, this.configurationSettings[deviceId]["configDevicePrecisionHum"]);
+				// Actual Temp
+				classNameStr = "deviceActualTemperature";
+				if ((this.configurationSettings[deviceId]["configDeviceWarnTempLow"] && actualTemperature <= this.configurationSettings[deviceId]["configDeviceTempThresholdLow"]) ||
+					(this.configurationSettings[deviceId]["configDeviceWarnTempHigh"] && actualTemperature >= this.configurationSettings[deviceId]["configDeviceTempThresholdHigh"])) {
+					classNameStr = classNameStr + " bright " + this.config.warnColor;
 				}
-				var setTemperature = this.prepareAttribute("SET_TEMPERATURE", settingsArray, this.configurationSettings[deviceId]["configDevicePrecisionTemp"]);
+				htmlDeviceEntry += "<span class='" + classNameStr + "'>" + actualTemperatureStr + "</span>";
 
-				//Before displaying the settings double-check against the configurationSettings
-				//(config.js) to drive the desired behavior...
-				if (this.configurationSettings[deviceId]["configDeviceLabel"] !== "") {
-					deviceLabel = this.configurationSettings[deviceId]["configDeviceLabel"];
-				}
-				var configDeviceShowFaultReport = "";
-				if (this.configurationSettings[deviceId]["configDeviceShowFaultReport"] === true) {
-					configDeviceShowFaultReport = faultReport;
+				// Set Temp
+				if (this.configurationSettings[deviceId]["configDeviceShowSetTemperature"]) {
+					htmlDeviceEntry += "<span class='deviceLabel'>&nbsp;/&nbsp;</span><span class='deviceSetTemperature'>" + setTemperature + "</span>"
 				}
 
-				classNameStr = "";
-
-				if (this.config.style == "lines") {
-					var configDeviceShowCurrentMode = "";
-					if (this.configurationSettings[deviceId]["configDeviceShowCurrentMode"] === true) {
-						configDeviceShowCurrentMode = "<span class='deviceMode'>&nbsp;(" + currentMode + ")</span>";
-					}
-					var configDeviceShowSetTemperature = "";
-					if (this.configurationSettings[deviceId]["configDeviceShowSetTemperature"] === true) {
-						//style the divider (slash) with the same style as the label
-						configDeviceShowSetTemperature = "<span class='deviceLabel'>&nbsp;/&nbsp;</span><span class='deviceSetTemperature'>" + setTemperature + "</span>";
-					}
-					deviceLabel = "<span class='deviceLabel'>" + deviceLabel + ":&nbsp;</span>";
-
-					// @spitzlbergerj warn colors
-					classNameStr = "deviceActualTemperature";
-					if (this.configurationSettings[deviceId]["configDeviceWarnTempLow"] && actualTemperature <= this.configurationSettings[deviceId]["configDeviceTempThresholdLow"]) {
-						classNameStr = classNameStr + " bright " + warnColor;
-					}
-					if (this.configurationSettings[deviceId]["configDeviceWarnTempHigh"] && actualTemperature >= this.configurationSettings[deviceId]["configDeviceTempThresholdHigh"]) {
-						classNameStr = classNameStr + " bright " + warnColor;
-					}
-					actualTemperatureStr = "<span class='" + classNameStr + "'>" + actualTemperatureStr + "</span>";
-
-					// @spitzlbergerj added humidity
+				// Hum
+				if (this.configurationSettings[deviceId]["configDeviceShowHumidity"] && deviceType == "WT") {
 					classNameStr = "";
-					if (this.configurationSettings[deviceId]["configDeviceShowHumidity"] === true && deviceType == "WT") {
-						if (this.configurationSettings[deviceId]["configDeviceWarnHumLow"] && actualHumidity <= this.configurationSettings[deviceId]["configDeviceHumThresholdLow"]) {
-							classNameStr = " class='bright " + warnColor + "'";
-						}
-						if (this.configurationSettings[deviceId]["configDeviceWarnHumHigh"] && actualHumidity >= this.configurationSettings[deviceId]["configDeviceHumThresholdHigh"]) {
-							classNameStr = " class='bright " + warnColor + "'";
-						}
-						humidityStrForLines = "<span class='deviceHumidity'>&nbsp;(" + this.translate("UNIT_HUM") + ":&nbsp;" + "<span" + classNameStr + ">" + actualHumidityStr + "</span>)&nbsp;</span>";
-					} else {
-						humidityStrForLines = "<span class='deviceHumidity'></span>";
+					if ((this.configurationSettings[deviceId]["configDeviceWarnHumLow"] && actualHumidity <= this.configurationSettings[deviceId]["configDeviceHumThresholdLow"]) ||
+						(this.configurationSettings[deviceId]["configDeviceWarnHumHigh"] && actualHumidity >= this.configurationSettings[deviceId]["configDeviceHumThresholdHigh"])) {
+						classNameStr = " class='bright " + this.config.warnColor + "'";
 					}
-
-					var newDevice = "<span class='deviceContainer'>" + deviceLabel + actualTemperatureStr + configDeviceShowSetTemperature + humidityStrForLines + configDeviceShowCurrentMode + "</span>";
-					newDevice += configDeviceShowFaultReport;
-					deviceName += newDevice;
-
-
-				} else if (this.config.style == "table") {
-					/**
-					 * Display the result as HTML table
-					 * create table row
-					 * @spitzlbergerj, 20190210
-					 **/
-
-					var row = document.createElement("tr");
-					row.className = "deviceContainer";
-					row.vAlign = "top";
-
-					var rowDevice = document.createElement("td");
-					rowDevice.className = "deviceLabel";
-					rowDevice.width = "120px";
-					rowDevice.appendChild(document.createTextNode(deviceLabel));
-
-					var rowActual = document.createElement("td");
-					classNameStr = "deviceActualTemperature";
-					if (this.configurationSettings[deviceId]["configDeviceWarnTempLow"] && actualTemperature <= this.configurationSettings[deviceId]["configDeviceTempThresholdLow"]) {
-						classNameStr = classNameStr + " bright " + warnColor;
-					}
-					if (this.configurationSettings[deviceId]["configDeviceWarnTempHigh"] && actualTemperature >= this.configurationSettings[deviceId]["configDeviceTempThresholdHigh"]) {
-						classNameStr = classNameStr + " bright " + warnColor;
-					}
-					rowActual.className = classNameStr;
-					rowActual.width = "100px";
-					rowActual.appendChild(document.createTextNode(actualTemperatureStr));
-
-					var rowSet = document.createElement("td");
-					rowSet.className = "deviceSetTemperature";
-					rowSet.width = "100px";
-					if (this.configurationSettings[deviceId]["configDeviceShowSetTemperature"] === true) {
-						if (this.config.setTempInBrackets) {
-							rowSet.appendChild(document.createTextNode("(" + setTemperature + ")"));
-						} else {
-							rowSet.appendChild(document.createTextNode(setTemperature));
-						}
-					} else {
-						rowHum.appendChild(document.createTextNode(""));
-					}
-
-					var rowMode = document.createElement("td");
-					rowMode.className = "deviceMode";
-					rowMode.width = "100px";
-					if (this.configurationSettings[deviceId]["configDeviceShowCurrentMode"] === true) {
-						rowMode.appendChild(document.createTextNode(currentMode));
-					} else {
-						rowMode.appendChild(document.createTextNode(""));
-					}
-
-					var rowFault = document.createElement("td");
-					rowFault.className = "faultReporting";
-					rowFault.appendChild(document.createTextNode(faultReport));
-
-					if (deviceType == "WT") {
-						var rowHum = document.createElement("td");
-						classNameStr = "deviceHumidity";
-						if (this.configurationSettings[deviceId]["configDeviceWarnHumLow"] && actualHumidity <= this.configurationSettings[deviceId]["configDeviceHumThresholdLow"]) {
-							classNameStr = classNameStr + " bright " + warnColor;
-						}
-						if (this.configurationSettings[deviceId]["configDeviceWarnHumHigh"] && actualHumidity >= this.configurationSettings[deviceId]["configDeviceHumThresholdHigh"]) {
-							classNameStr = classNameStr + " bright " + warnColor;
-						}
-						rowHum.className = classNameStr;
-						rowHum.width = "100px";
-						if (this.configurationSettings[deviceId]["configDeviceShowHumidity"] === true) {
-							rowHum.appendChild(document.createTextNode(actualHumidityStr));
-						} else {
-							rowHum.appendChild(document.createTextNode(""));
-						}
-					} else if (deviceType == "RT") {
-						var rowValve = document.createElement("td");
-						rowValve.className = "deviceValveState";
-						rowValve.width = "100px";
-						rowValve.appendChild(document.createTextNode(valveState));
-					}
-
-					// Building of the table row
-					var columns = 2;
-					row.appendChild(rowDevice);
-					row.appendChild(rowActual);
-
-					if (this.configurationSettings["global"]["configColumnSetTemp"] === true) {
-						columns += 1;
-						row.appendChild(rowSet);
-					}
-
-					if (this.configurationSettings["global"]["configColumnHumidity"] === true) {
-						columns += 1;
-						row.appendChild(rowHum);
-					}
-
-					if (this.configurationSettings["global"]["configColumnMode"] === true) {
-						columns += 1;
-						row.appendChild(rowMode);
-					}
-
-					table.appendChild(row);
-
-					if (this.configurationSettings[deviceId]["configDeviceShowFaultReport"] === true) {
-						var row2 = document.createElement("tr");
-						row2.className = "faultReportingRow";
-						row2.vAlign = "top";
-						var rowFault = document.createElement("td");
-						rowFault.className = "faultReporting";
-						rowFault.colSpan = columns;
-						rowFault.appendChild(document.createTextNode(configDeviceShowFaultReport));
-						if (configDeviceShowFaultReport != "") {
-							table.appendChild(row2);
-						}
-					}
+					htmlDeviceEntry += "<span class='deviceHumidity'>&nbsp;(" + this.translate("UNIT_HUM") + ":&nbsp;" + "<span" + classNameStr + ">" + actualHumidityStr + "</span>)&nbsp;</span>";
 				}
-			}
-		}
 
-		if (this.config.style == "table") {
-			// Log.info(table);
-			deviceName = table.outerHTML;
-		}
-		// Log.info(deviceName);
-		this.moduleDisplay = deviceName;
-		this.updateDom();
+				// Mode
+				if (this.configurationSettings[deviceId]["configDeviceShowCurrentMode"]) {
+					htmlDeviceEntry += "<span class='deviceMode'>&nbsp;(" + currentMode + ")</span>";
+				}
+
+				htmlDeviceEntry += "</span>";
+
+				// Show Fault
+				if (this.configurationSettings[deviceId]["configDeviceShowFaultReport"]) {
+					htmlDeviceEntry += faultMode
+				}
+
+				htmlOutput += htmlDeviceEntry;
+
+			}
+		})
+		return htmlOutput;
 	},
 
 	/**
@@ -467,12 +305,12 @@ Module.register("MMM-Homematic-Thermostats", {
 	 * to be able to use it in the translation files. Return an empty
 	 * string if everything is fine.
 	 */
-	prepareFaultReporting: function (settingsArray) {
-		var errorMsg = "";
+	prepareFaultReporting: function (faultReporting) {
+		let errorMsg = "";
 		// @spitzlbergerj, 20190210: wall thermostat doesn't contain element FAULT_REPORTING
-		if (settingsArray["FAULT_REPORTING"] >= 0) {
+		if (!!faultReporting) {
 			// @spitzlbergerj, 20190210: Array with element FAULT-REPORTING, should be radiator thermostat
-			var faultCode = Number(settingsArray["FAULT_REPORTING"]["value"]);
+			const faultCode = Number(faultReporting["value"]);
 			switch (faultCode) {
 				case 1:
 					errorMsg = this.translate("VALVE_TIGHT");
@@ -486,23 +324,19 @@ Module.register("MMM-Homematic-Thermostats", {
 				case 4:
 					errorMsg = this.translate("COMMUNICATION_ERROR");
 					break;
-				case 5:
-					errorMsg = ""; //Not available - no documentation
-					break;
 				case 6:
 					errorMsg = this.translate("LOWBAT");
-					//Append the current battery state just for information
-					errorMsg += " ";// + Number(parseFloat(settingsArray["BATTERY_STATE"]["value"]).toFixed(2)) + settingsArray["BATTERY_STATE"]["valueunit"]
 					break;
 				case 7:
 					errorMsg = this.translate("VALVE_ERROR_POSITION");
+					break;
 			}
 		}
-		//Return the translated i18n error message - if any
+
 		if (errorMsg !== "") {
-			errorMsg = "<span class='faultReporting'>" + this.translate("WARNING") + errorMsg + "</span>";
+			return "<span class='faultReporting'>" + this.translate("WARNING") + errorMsg + "</span>";
 		}
-		return errorMsg;
+		return "";
 	},
 
 	// Define required style-sheet scripts
